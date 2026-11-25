@@ -8,6 +8,13 @@
 > free-listening days" campaign via real-device UI automation (ADB + OCR). It only
 > simulates human taps — no app modification, no ad-report forgery, no DRM bypass.
 
+| 监控面板 | 欢迎页 |
+|:---:|:---:|
+| ![面板预览](assets/dashboard-demo.jpg) | ![欢迎页预览](assets/dashboard-welcome.jpg) |
+| 流体云胶囊 + 天数进度 + 实时日志 | 首次启动说明它在干什么 |
+
+*（图中均为合成演示数据，不涉及任何真实账号）*
+
 ## 原理 | How it works
 
 手机连 ADB → 脚本循环 `screencap` 截屏 → RapidOCR 识别界面文字 → 按优先级模拟真实点击：
