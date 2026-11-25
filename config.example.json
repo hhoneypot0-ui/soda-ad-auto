@@ -1,0 +1,54 @@
+{
+  "adb_path": "adb",
+  "serial": null,
+  "poll_interval": 3.0,
+  "daily_goal": 0,
+  "max_runtime_min": 360,
+  "max_stuck_rounds": 6,
+  "dry_run": false,
+  "keep_screen_on": true,
+  "mute_during_run": true,
+  "stuck_archive_after": 60,
+  "panel_port": 8765,
+  "ocr_min_confidence": 0.5,
+  "roi": null,
+  "cancel_targets": [
+    "退出不看了",
+    "不看了",
+    "取消"
+  ],
+  "reward_targets": [
+    "领取奖励",
+    "立即领取",
+    "免费领取",
+    "开心收下",
+    "点击领取"
+  ],
+  "success_targets": [
+    "领取成功",
+    "已领取",
+    "免费听时长",
+    "分钟免费听"
+  ],
+  "close_targets": [
+    "完成",
+    "我知道了"
+  ],
+  "go_targets": [
+    "继续观看",
+    "再看一条",
+    "看视频",
+    "免费播放",
+    "继续播放",
+    "立即去听",
+    "去收听",
+    "开始免费听"
+  ],
+  "package": "com.luna.music",
+  "skip_targets": [
+    "跳过广告",
+    "跳过"
+  ],
+  "notes": "关键词按识别到的文本做包含匹配，优先级从上到下列表顺序之外：取消 > 领取 > 关闭成功弹窗 > 继续观看 > 跳过(需广告剩余时间<=skip_wait且skip出现)。skip_wait 由 skip_after_seconds 控制。",
+  "skip_after_seconds": 6
+}
