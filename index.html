@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SodaAdAuto · 汽水音乐挂机助手</title>
+<meta name="description" content="开源的汽水音乐「看广告攒免费听天数」桌面自动化助手：零窗口、零噪音、全程自愈、隐私不出本机。">
+<style>
+:root{
+  --ink:#1d2436; --muted:#5b6780; --faint:#93a0ba;
+  --blue:#3f7bff; --green:#00d27e; --violet:#7c5cff; --pink:#ff5e9a; --orange:#ff9f2e; --red:#ff5460;
+  --card:rgba(255,255,255,.72); --stroke:rgba(255,255,255,.9);
+  --r:24px; --font:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{font-family:var(--font);color:var(--ink);background:#eef3fc;overflow-x:hidden}
+.wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+.blob{position:fixed;border-radius:50%;filter:blur(90px);opacity:.45;z-index:-1;pointer-events:none}
+.b1{width:520px;height:520px;left:-140px;top:-160px;background:radial-gradient(circle,#7ec8ff,#2f7dff)}
+.b2{width:460px;height:460px;right:-120px;top:80px;background:radial-gradient(circle,#93ffd6,#00d27e)}
+.b3{width:420px;height:420px;left:30%;bottom:-200px;background:radial-gradient(circle,#c3b3ff,#7c5cff)}
+header{display:flex;align-items:center;gap:12px;padding:22px 0}
+.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;box-shadow:0 10px 24px rgba(47,174,255,.35)}
+.logo svg{width:22px;height:22px;fill:#fff}
+header b{font-size:17px}
+header nav{margin-left:auto;display:flex;gap:8px}
+.hero{padding:56px 0 40px;text-align:center}
+.hero h1{font-size:clamp(34px,6vw,58px);margin:0 0 14px;line-height:1.15;
+  background:linear-gradient(110deg,var(--blue),var(--violet) 45%,var(--pink) 85%);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:17px;color:var(--muted);max-width:640px;margin:0 auto 30px;line-height:1.7}
+.btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:13px 28px;border-radius:99px;
+  font-size:15.5px;font-weight:650;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px)}
+.b-g{color:#fff;background:linear-gradient(120deg,var(--blue),var(--violet));box-shadow:0 14px 30px rgba(90,90,255,.35)}
+.b-o{color:var(--ink);background:var(--card);border:1px solid var(--stroke);box-shadow:0 10px 24px rgba(56,86,140,.12)}
+.btn svg{width:17px;height:17px;fill:currentColor}
+h2{font-size:26px;margin:64px 0 8px;text-align:center}
+.sub{text-align:center;color:var(--muted);margin:0 0 30px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.step{background:var(--card);backdrop-filter:blur(16px) saturate(1.4);border:1px solid var(--stroke);
+  border-radius:var(--r);padding:26px;box-shadow:0 16px 40px rgba(56,86,140,.12)}
+.dot3{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin-bottom:16px;color:#fff}
+.dot3 svg{width:22px;height:22px;fill:#fff}
+.d-green{background:linear-gradient(135deg,#00e07a,#0a9cff);box-shadow:0 10px 22px rgba(0,200,140,.35)}
+.d-red{background:linear-gradient(135deg,#ff5460,#ffa03c);box-shadow:0 10px 22px rgba(255,90,90,.3)}
+.d-violet{background:linear-gradient(135deg,#5b8cff,#9a5cff);box-shadow:0 10px 22px rgba(120,90,255,.3)}
+.step h3{margin:0 0 8px;font-size:18px}
+.step p{margin:0;font-size:14.5px;color:var(--muted);line-height:1.7}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.feat{background:var(--card);border:1px solid var(--stroke);border-radius:18px;padding:18px 20px;
+  font-size:14.5px;color:var(--ink);display:flex;gap:12px;align-items:flex-start}
+.feat svg{width:19px;height:19px;flex:none;margin-top:2px}
+.feat small{display:block;color:var(--muted);margin-top:4px;line-height:1.55}
+.f-green svg{fill:var(--green)}.f-blue svg{fill:var(--blue)}.f-violet svg{fill:var(--violet)}
+.f-pink svg{fill:var(--pink)}.f-orange svg{fill:var(--orange)}
+.f-red svg{fill:var(--red)}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);
+  border:1px solid var(--stroke);border-radius:var(--r);overflow:hidden;font-size:14.5px}
+th,td{text-align:left;padding:13px 18px}
+th{background:rgba(63,123,255,.1);font-weight:650}
+td:first-child{white-space:nowrap;font-weight:600}
+tr+tr td{border-top:1px solid rgba(120,140,180,.12)}
+.faq{display:flex;flex-direction:column;gap:12px;max-width:760px;margin:0 auto}
+details{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:16px 22px}
+summary{cursor:pointer;font-weight:650;font-size:15px}
+details p{color:var(--muted);font-size:14.5px;line-height:1.7;margin:12px 0 0}
+footer{margin:72px 0 34px;text-align:center;font-size:13px;color:var(--faint);line-height:1.9}
+footer a{color:var(--blue)}
+</style></head><body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M9 17.5a3 3 0 1 1-2-2.83V6.2a1 1 0 0 1 .76-.97l9-2.25A1 1 0 0 1 18 4v9.67a3 3 0 1 1-2-2.83V8.28l-7 1.75v7.47z"/></svg></div>
+    <b>SodaAdAuto</b>
+    <nav><a class="btn b-o" href="https://github.com/hhoneypot0-ui/soda-ad-auto">GitHub</a></nav>
+  </header>
+
+  <div class="hero">
+    <h1>看广告攒免费听天数<br>这件事，交给它</h1>
+    <p>开源的汽水音乐桌面助手：手机插上一根线，电脑点一下，剩下的它全自动完成。<br>
+    零黑窗口、零噪音、断线自愈、进度弹窗回执——安静得像没在跑。</p>
+    <div class="btns">
+      <a class="btn b-g" href="https://github.com/hhoneypot0-ui/soda-ad-auto/releases"><svg viewBox="0 0 24 24"><path d="M12 16 6 10h4V4h4v6h4z M4 18h16v2H4z"/></svg>下载工具</a>
+      <a class="btn b-o" href="#quick">30 秒上手 ↓</a>
+    </div>
+  </div>
+
+  <h2 id="quick">桌面三件套</h2>
+  <p class="sub">安装后桌面只有三个图标，颜色即功能</p>
+  <div class="steps">
+    <div class="step"><div class="dot3 d-green"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+      <h3>启动</h3><p>双击即后台运行。几秒后弹一次"启动成功"回执，除此之外屏幕上不会再出现任何东西。</p></div>
+    <div class="step"><div class="dot3 d-red"><svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg></div>
+      <h3>停止</h3><p>一键收工：验证进程真停干净才报"已停止"，自动清理运行截图，全程保持静音。</p></div>
+    <div class="step"><div class="dot3 d-violet"><svg viewBox="0 0 24 24"><path d="M5 15h3V9H5zm5.5 0h3V4h-3zM16 15h3v-8h-3z"/></svg></div>
+      <h3>面板</h3><p>ColorOS 流体云风格的网页仪表盘：实时天数、30 天进度条、手机画面、运行日志。</p></div>
+  </div>
+
+  <h2>为什么选它</h2>
+  <div class="feats">
+    <div class="feat f-green"><svg viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg><div>纯官方奖励，不越线<small>只模拟真人点击"看广告领奖"，不改 App、不伪造上报、不绕付费</small></div></div>
+    <div class="feat f-blue"><svg viewBox="0 0 24 24"><path d="M12 14a4 4 0 0 0 4-4V5a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V21h2v-3.1A8 8 0 0 0 20 10z"/></svg><div>全程静音<small>开跑压零、运行中巡检防反弹、结束后保持安静</small></div></div>
+    <div class="feat f-violet"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8z"/></svg><div>断线自愈<small>手机掉线自动安全退出；跑偏界面自动拉回；诱饵按钮永不点</small></div></div>
+    <div class="feat f-orange"><svg viewBox="0 0 24 24"><path d="M17 1 7 12l-4-4-1.5 1.5L7 15l12-12z"/></svg><div>重复点击免疫<small>互斥体+锁文件双保险，狂点"启动"也只跑一份、只弹一个回执</small></div></div>
+    <div class="feat f-pink"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5.2L4 17.2z"/></svg><div>隐私不出本机<small>仪表盘 127.0.0.1 本地服务，退出自动清空截图，日志留在本地</small></div></div>
+    <div class="feat f-red"><svg viewBox="0 0 24 24"><path d="M7 3h10v2h5v4h-5v2H7v-2H2V5h5zm0 10h10v8H7z"/></svg><div>任何安卓机可用<small>自动识别设备与分辨率，无机型绑定，前台检测自动选机</small></div></div>
+  </div>
+
+  <h2>弹窗暗号对照</h2>
+  <table>
+    <tr><th>看到什么</th><th>它的意思</th></tr>
+    <tr><td>启动成功 ✔</td><td>已在后台运行——别看屏幕找窗口，本来就没有窗口</td></tr>
+    <tr><td>已在运行中</td><td>你又多点了一次启动，忽略即可，不会有第二份</td></tr>
+    <tr><td>已停止 ✔</td><td>验证过进程、端口、截图都清干净后才敢这么说</td></tr>
+    <tr><td>启动失败 ✘</td><td>九成是手机没插好/没解锁，照着弹窗清单处理再点一次</td></tr>
+  </table>
+
+  <h2>常见问题</h2>
+  <div class="faq">
+    <details><summary>攒到的天数在哪看？</summary><p>手机：汽水音乐 App →「我的」→ 免费听/会员天数。电脑：双击「面板」，大数字 + 进度条一目了然（上限 30 天）。</p></details>
+    <details><summary>需要 root / 会封手机吗？</summary><p>不需要 root，只要一根数据线 + 开发者选项里的 USB 调试。工具只做真机界面点击；但自动化行为属于平台协议灰色地带，建议用不重要的账号，出现平台验证或领取明显变慢请立即停用。</p></details>
+    <details><summary>支持 Mac / Linux 吗？</summary><p>核心脚本跨平台（Python），桌面一键启动器目前为 Windows 设计；Linux/macOS 用户可直接命令行运行 <code>python qishui_auto.py</code>。</p></details>
+    <details><summary>App 改版后点不动了？</summary><p>不用改代码：打开 config.json，把新按钮的文字加进 reward_targets 等关键词列表即可。面板卡壳时自动存的 debug_clicks 截图会告诉你它看到了什么。</p></details>
+  </div>
+
+  <footer>
+    SodaAdAuto · MIT 开源 · 仅供学习研究，使用风险自负<br>
+    与汽水音乐/字节跳动无关联 · <a href="https://github.com/hhoneypot0-ui/soda-ad-auto">github.com/hhoneypot0-ui/soda-ad-auto</a>
+  </footer>
+</div>
+</body></html>

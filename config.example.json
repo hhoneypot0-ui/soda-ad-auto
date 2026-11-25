@@ -51,5 +51,6 @@
   ],
   "notes": "关键词按识别到的文本做包含匹配，优先级从上到下列表顺序之外：取消 > 领取 > 关闭成功弹窗 > 继续观看 > 跳过(需广告剩余时间<=skip_wait且skip出现)。skip_wait 由 skip_after_seconds 控制。",
   "skip_after_seconds": 6,
-  "cleanup_on_exit": true
+  "cleanup_on_exit": true,
+  "open_browser_on_start": true
 }

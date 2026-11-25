@@ -19,6 +19,7 @@ qishui_auto.py — 汽水音乐「自动看广告领免费听时长」真机 UI 
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -78,6 +79,51 @@ def cleanup_images() -> int:
                     pass
     return n
 
+_MUTEX_HANDLE = None
+
+def panel_window_open(marker: str = "【汽水面板】") -> bool:
+    """枚举可见窗口，浏览器标签页标题即窗口标题，检测面板是否已经开着。"""
+    if sys.platform != "win32":
+        return False
+    import ctypes
+    user32 = ctypes.windll.user32
+    found = []
+    EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+    def cb(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        n = user32.GetWindowTextLengthW(hwnd)
+        if n <= 0:
+            return True
+        buf = ctypes.create_unicode_buffer(n + 1)
+        user32.GetWindowTextW(hwnd, buf, n + 1)
+        if marker in buf.value:
+            found.append(buf.value)
+        return True
+
+    user32.EnumWindows(EnumWindowsProc(cb), 0)
+    return bool(found)
+
+def open_panel_browser(cfg: dict) -> None:
+    """有可见窗口哨兵则不再重复打开，防连点成窗海。"""
+    if panel_window_open():
+        return
+    try:
+        os.startfile(f"http://127.0.0.1:{cfg['panel_port']}")
+    except Exception:
+        pass
+
+def acquire_single_instance(name: str = "Local\\SodaAdAuto_Run") -> bool:
+    """Windows 命名互斥体实现真·单实例（端口探测不可靠：SO_REUSEADDR 会让重复 bind 成功）。
+    返回 False = 已有实例持有锁。"""
+    global _MUTEX_HANDLE
+    if sys.platform != "win32":
+        return True
+    import ctypes
+    _MUTEX_HANDLE = ctypes.windll.kernel32.CreateMutexW(None, False, name)
+    return ctypes.windll.kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
+
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         example = BASE / "config.example.json"
@@ -107,9 +153,11 @@ def _resolve_adb(path: str) -> str:
                      "或在 config.json 的 adb_path 中指定完整路径")
 
 class Adb:
-    def __init__(self, adb_path: str, serial: str | None, log: Log):
+    def __init__(self, adb_path: str, serial: str | None, log: Log,
+                 pkg: str = "com.luna.music"):
         self.adb = _resolve_adb(adb_path)
         self.log = log
+        self.pkg = pkg
         self.serial = serial or self._pick_serial()
         # logical/physical scale for tap coordinates
         phys = self._parse_size(self.shell("wm size"), "Physical size")
@@ -118,29 +166,50 @@ class Adb:
         self.physical = phys
         self.scale_x = self.logical[0] / self.physical[0] if self.physical else 1.0
         self.scale_y = self.logical[1] / self.physical[1] if self.physical else 1.0
-        log(f"设备 {self.serial}，物理分辨率 {self.physical}，逻辑分辨率 {self.logical}")
+        self.model = self.shell("getprop ro.product.model") or self.serial
+        log(f"设备 {self.model}（{self.serial}），分辨率 {self.physical}")
 
     def _run(self, args: list[str]) -> subprocess.CompletedProcess:
         cmd = [self.adb]
         if self.serial:
             cmd += ["-s", self.serial]
         cmd += args
-        return subprocess.run(cmd, capture_output=True, timeout=30)
+        kwargs = {}
+        if sys.platform == "win32":
+            # pythonw 下启动控制台程序(adb.exe)必须禁窗，否则每次调用闪一个终端
+            kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+        return subprocess.run(cmd, capture_output=True, timeout=30, **kwargs)
 
     def shell(self, cmd: str) -> str:
         r = self._run(["shell", cmd])
         return r.stdout.decode("utf-8", "replace").strip()
 
     def _pick_serial(self) -> str:
-        out = self._run(["devices"]).stdout.decode("utf-8", "replace")
+        out = subprocess.run([self.adb, "devices"], capture_output=True,
+                             timeout=30).stdout.decode("utf-8", "replace")
         serials = [ln.split("\t")[0] for ln in out.splitlines()[1:] if "\tdevice" in ln]
         if not serials:
             print("未检测到 ADB 设备：请连接手机并开启 USB 调试（或在设置里开启无线调试）。", file=sys.stderr)
             sys.exit(1)
-        if len(serials) > 1:
-            print(f"检测到多个设备 {serials}，请用 --device 指定。", file=sys.stderr)
-            sys.exit(1)
-        return serials[0]
+        if len(serials) == 1:
+            return serials[0]
+        # 多台设备：优先"前台正显示汽水音乐"的那台，其次装了该 App 的那台
+        self.log(f"检测到 {len(serials)} 台设备，按汽水音乐前台/安装状态自动选择…")
+        installed = []
+        for s in serials:
+            self.serial = s
+            focus = self.shell("dumpsys window | grep -m1 mCurrentFocus")
+            if self.pkg in focus:
+                self.log(f"选中 {s}（汽水音乐正在前台显示）")
+                return s
+            if f"package:{self.pkg}" in self.shell(f"pm list packages {self.pkg}"):
+                installed.append(s)
+        if installed:
+            self.serial = installed[0]
+            self.log(f"选中 {installed[0]}（已安装汽水音乐，前台未显示）")
+            return installed[0]
+        print("多台设备均未安装汽水音乐，请先安装或用 --device 指定。", file=sys.stderr)
+        sys.exit(1)
 
     @staticmethod
     def _parse_size(out: str, label: str) -> tuple[int, int] | None:
@@ -201,6 +270,8 @@ class Ocr:
             })
         return boxes
 
+BAD_HINTS = ("充电", "电量", "拔线", "电完成")  # 系统/充电弹窗字样，任何目标都不许匹配到含这些词的框
+
 def find(boxes: list[dict], targets: list[str], skip_locked: bool = False,
          max_len: int = 12, exactish: bool = False) -> dict | None:
     """按 targets 顺序匹配。只接受文本长度<=max_len 的"按钮体"匹配，
@@ -209,7 +280,7 @@ def find(boxes: list[dict], targets: list[str], skip_locked: bool = False,
     for t in targets:
         for b in boxes:
             txt = b["text"]
-            if not t:
+            if not t or any(h in txt for h in BAD_HINTS):
                 continue
             ok = (txt == t or (not exactish and t in txt)) if exactish else t in txt
             if ok and len(txt) <= max(12, len(t) + 2 if exactish else max_len):
@@ -253,7 +324,7 @@ PANEL_HTML = """
 <!doctype html>
 <html lang="zh" data-zcode-design><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>汽水音乐 · 流体云监控</title>
+<title>【汽水面板】汽水音乐 · 流体云监控</title>
 <style>
 :root{
   --ink:#22293c; --muted:#5f6b84; --faint:#93a0ba;
@@ -338,6 +409,19 @@ body{font-family:var(--font);color:var(--ink);min-height:100vh;overflow-x:hidden
   font-family:var(--mono);font-size:12.5px;line-height:1.8;color:#33405e;white-space:pre-wrap}
 .logbox::-webkit-scrollbar{width:8px}.logbox::-webkit-scrollbar-thumb{background:rgba(120,140,180,.35);border-radius:8px}
 footer{margin-top:24px;text-align:center;font-size:12px;color:var(--faint)}
+.welcome{position:fixed;inset:0;z-index:50;display:none;place-items:center;background:rgba(12,16,28,.42);backdrop-filter:blur(12px) saturate(1.2)}
+.welcome.show{display:grid}
+.wcard{width:min(580px,92vw);border-radius:34px;padding:36px 40px;background:linear-gradient(160deg,rgba(255,255,255,.94),rgba(255,255,255,.8));border:1px solid rgba(255,255,255,.95);box-shadow:0 40px 100px rgba(15,25,55,.4)}
+.wmark{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),#17b3ff);box-shadow:0 14px 34px rgba(47,224,138,.4);margin-bottom:20px}
+.wmark svg{width:30px;height:30px;fill:#05130c}
+.wcard h2{margin:0 0 10px;font-size:25px}
+.wsub{color:var(--muted);font-size:14px;line-height:1.75;margin:0 0 20px}
+.wlist{display:flex;flex-direction:column;gap:12px;margin-bottom:26px}
+.witem{display:flex;gap:11px;font-size:14.5px;color:var(--ink);line-height:1.6}
+.witem svg{width:19px;height:19px;flex:none;margin-top:3px}
+.wgo{border:none;cursor:pointer;font-family:var(--font);font-size:16px;font-weight:650;color:#fff;padding:14px 30px;border-radius:99px;background:linear-gradient(120deg,var(--blue),var(--violet) 55%,var(--pink));box-shadow:0 14px 34px rgba(90,90,255,.35);transition:transform .15s,box-shadow .15s}
+.wgo:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(90,90,255,.45)}
+.wnote{font-size:12px;color:var(--faint);margin-top:14px}
 </style></head><body>
 <div class="bg"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
 <div class="island" id="island">
@@ -368,6 +452,18 @@ footer{margin-top:24px;text-align:center;font-size:12px;color:var(--faint)}
     <div class="logbox" id="log"></div>
   </div>
 </div>
+<div class="welcome" id="welcome"><div class="wcard">
+ <div class="wmark"><svg viewBox="0 0 24 24"><path d="M9 17.5a3 3 0 1 1-2-2.83V6.2a1 1 0 0 1 .76-.97l9-2.25A1 1 0 0 1 18 4v9.67a3 3 0 1 1-2-2.83V8.28l-7 1.75v7.47z"/></svg></div>
+ <h2>欢迎使用 · 汽水音乐自动免费听</h2>
+ <p class="wsub">接下来的一切都会<b>安静地自动进行</b>：没有黑色窗口、没有声音、不需要你动手。看到这个页面，就代表已经开始工作了。</p>
+ <div class="wlist">
+  <div class="witem"><svg class="i-green" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 10.4 3.2 2.3-1 1.4L11 13V6h2z"/></svg><span>自动看广告，领"第 N 日免费听"（上限 30 天），领完自动收工</span></div>
+  <div class="witem"><svg class="i-blue" viewBox="0 0 24 24"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm3 17h4v1h-4z"/></svg><span id="wdev">已连接手机：识别中…</span></div>
+  <div class="witem"><svg class="i-pink" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1.2 14.6 5.6-5.6-1.4-1.4-4.2 4.2-2-2-1.4 1.4z"/></svg><span>想停下就双击桌面「停止」；每次退出都会自动删除手机画面截图</span></div>
+ </div>
+ <button class="wgo" id="wgo">进入监控台 →</button>
+ <div class="wnote">本页面只存在于你的电脑（127.0.0.1），运行数据从不上传互联网。</div>
+</div></div>
 <footer>汽水音乐自动化 · 仅本机 127.0.0.1:8765 · 先「启动」再看面板</footer>
 <script>
 const logEl=document.getElementById('log');let stick=true;
@@ -392,6 +488,7 @@ async function tick(){
   $('pctchip').textContent='进度 '+pct.toFixed(0)+'%';
   $('claims').textContent=s.claims??'—';
   $('last').textContent=s.last_action??'—';
+  if(s.device)$('wdev').textContent='已连接手机：'+s.device;
   $('shot').src='/shot?ts='+Date.now();
   const t=await (await fetch('/tail?ts='+Date.now())).text();
   if(t!==logEl.textContent){logEl.textContent=t;if(stick)logEl.scrollTop=logEl.scrollHeight;}
@@ -401,6 +498,8 @@ async function tick(){
  }
 }
 tick();setInterval(tick,2000);
+if(!localStorage.getItem('soda.welcomed'))$('welcome').classList.add('show');
+$('wgo').onclick=()=>{localStorage.setItem('soda.welcomed','1');$('welcome').classList.remove('show');};
 </script></body></html>
 """
 
@@ -458,10 +557,25 @@ def run(cfg: dict, args) -> None:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"ts": time.time(), "msg": msg}, ensure_ascii=False) + "\n")
 
-    adb = Adb(cfg["adb_path"], args.device or cfg.get("serial"), logall)
+    # 真·单实例：拿不到互斥体 = 已有一个在跑。静默退出，绝不弹窗、绝不开第二个浏览器窗口
+    if not acquire_single_instance():
+        logall("已有实例在运行，本次启动静默退出")
+        sys.exit(0)
+
+    adb = Adb(cfg["adb_path"], args.device or cfg.get("serial"), logall,
+              cfg.get("package", "com.luna.music"))
+    # 先开面板与浏览器，让"启动成功"回执在几秒内可达；OCR 模型预热放后台
+    try:
+        start_panel(cfg["panel_port"], logall)
+    except OSError:
+        logall("面板端口被占用（可能有旧实例残留），本次启动退出")
+        sys.exit(0)
+    write_state(date=str(date.today()), device=adb.model, alive=True,
+                last_action="引擎预热中")
+    if cfg.get("open_browser_on_start", True):
+        open_panel_browser(cfg)   # 面板窗口已存在就不再重复开，杜绝窗海
     ocr = Ocr()
     logall("初始化完成，等待手机停在广告页面…按 Ctrl+C 停止")
-    start_panel(cfg["panel_port"], logall)
 
     if cfg["mute_during_run"]:
         adb.force_mute()
@@ -477,7 +591,8 @@ def run(cfg: dict, args) -> None:
     max_runtime = cfg.get("max_runtime_min", 360) * 60      # 硬时长上限
     idle_stop = cfg.get("max_stuck_rounds", 6) * stuck_after # 连续无进展自动收工
 
-    state = {"last_action": "待命", "claims": 0, "runs": 0, "pool_days": None, "pool_need": None}
+    state = {"last_action": "待命", "claims": 0, "runs": 0, "pool_days": None,
+             "pool_need": None, "device": None}
     try:
         s = json.loads(STATE_PATH.read_text(encoding="utf-8"))
         if s.get("date") == str(date.today()):
@@ -489,6 +604,7 @@ def run(cfg: dict, args) -> None:
     except Exception:
         pass
 
+    state["device"] = adb.model
     last_action_time = time.time()
     start_time = time.time()
     last_claim_time = time.time()
@@ -496,13 +612,25 @@ def run(cfg: dict, args) -> None:
     prev_box = None
     repeat_n = 0
     saw_countdown = False
+    cap_fail = 0
     try:
         while True:
             img = adb.screencap()
             if img is None:
-                logall("截图失败，2 秒后重试")
+                cap_fail += 1
+                if cap_fail == 3:
+                    adb.keyevent(4)   # BACK：收起通知栏/返回上层
+                    logall("截图失败×3，尝试 BACK 收起通知栏")
+                elif cap_fail == 8:
+                    adb.keyevent(3)   # HOME：回桌面（随后手动开汽水音乐即可）
+                    logall("截图失败×8，尝试 HOME 唤醒回桌面")
+                if cap_fail >= 15:
+                    logall("连续截图失败（手机可能已断开），自动退出")
+                    break
+                logall(f"截图失败，2 秒后重试（{cap_fail}/15）")
                 time.sleep(2)
                 continue
+            cap_fail = 0
             save_img(SHOT_PATH, img, quality=80)
 
             boxes = ocr.read(img, min_conf)
@@ -542,6 +670,15 @@ def run(cfg: dict, args) -> None:
                     save_img(p, img)
                     logall(f"超过 {stuck_after}s 无可操作按钮，已存截图 {p.name}（当前: {texts}）")
                     last_action_time = time.time()
+                    # 前台不是汽水音乐（通知栏/桌面/别的App）→ 先收帘再拉回
+                    focus = adb.current_focus()
+                    pkg = cfg.get("package", "com.luna.music")
+                    if "NotificationShade" in focus or "Keyguard" in focus:
+                        adb.keyevent(4)   # 收起通知栏/锁屏
+                        logall("检测到通知栏/锁屏遮挡，BACK 收起")
+                    if pkg not in focus:
+                        adb.shell(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1")
+                        logall(f"前台是 {focus.strip()[:60]}，已自动拉回汽水音乐")
                     # 落地页/直播卡片特征：BACK 自救一次（绝不点『进入直播/立即下载』诱饵）
                     if any(m in b["text"] and len(b["text"]) <= 6
                            for b in boxes for m in ("立即下载", "进入直播")):
@@ -587,7 +724,7 @@ def run(cfg: dict, args) -> None:
 
             write_state(date=str(date.today()), claims=state["claims"],
                         runs=state["runs"], pool_days=state["pool_days"],
-                        pool_need=state["pool_need"],
+                        pool_need=state["pool_need"], device=state["device"],
                         last_action=state["last_action"], alive=True)
             if goal and state["claims"] >= goal:
                 logall(f"已达目标 {goal} 次，停止。")
@@ -600,13 +737,20 @@ def run(cfg: dict, args) -> None:
                 break
             time.sleep(poll)
     finally:
-        if cfg["mute_during_run"]:
-            adb.force_mute()
-            logall("已保持静音状态（按设置不恢复音量；想听声音请按手机音量+）")
-        adb.shell("svc power stayon false")
+        # 手机已断开时这些 adb 调用会炸，全部容错，保证 write_state/清图一定执行
+        try:
+            if cfg["mute_during_run"]:
+                adb.force_mute()
+                logall("已保持静音状态（按设置不恢复音量；想听声音请按手机音量+）")
+        except Exception:
+            pass
+        try:
+            adb.shell("svc power stayon false")
+        except Exception:
+            pass
         write_state(date=str(date.today()), claims=state["claims"],
                     runs=state["runs"], pool_days=state["pool_days"],
-                    pool_need=state["pool_need"],
+                    pool_need=state["pool_need"], device=state["device"],
                     last_action=state["last_action"], alive=False)
         if cfg.get("cleanup_on_exit", True):
             n = cleanup_images()
@@ -639,6 +783,8 @@ def decide(cfg: dict, boxes: list[dict], screen_h: int) -> tuple[str, dict] | No
     # 领取奖励：只认位于画面中下部、短文本的大按钮
     for t in cfg["reward_targets"]:
         for box in boxes:
+            if any(h in box["text"] for h in BAD_HINTS):
+                continue
             if t in box["text"] and len(box["text"]) <= 12 \
                and not is_countdown_locked(box["text"]) \
                and box["cy"] > screen_h * 0.4:
@@ -657,7 +803,8 @@ def decide(cfg: dict, boxes: list[dict], screen_h: int) -> tuple[str, dict] | No
     return None
 
 def once(cfg: dict, args) -> None:
-    adb = Adb(cfg["adb_path"], args.device or cfg.get("serial"), Log(Path("NUL")))
+    adb = Adb(cfg["adb_path"], args.device or cfg.get("serial"), Log(Path("NUL")),
+              cfg.get("package", "com.luna.music"))
     ocr = Ocr()
     img = adb.screencap()
     if img is None:
@@ -670,7 +817,22 @@ def once(cfg: dict, args) -> None:
         print(f"  ({int(b['cx'])},{int(b['cy'])})  conf={b['conf']:.2f}  {b['text']}")
 
 def main() -> None:
-    sys.stdout.reconfigure(encoding="utf-8")
+    if sys.stdout is None:  # pythonw 无控制台模式启动时兼容
+        import io, os
+        sys.stdout = sys.stderr = io.TextIOWrapper(open(os.devnull, "wb"), encoding="utf-8")
+    else:
+        sys.stdout.reconfigure(encoding="utf-8")
+    RUNTIME.mkdir(exist_ok=True)
+    import traceback
+
+    def crash_hook(exc_type, exc, tb):
+        text = "".join(traceback.format_exception(exc_type, exc, tb))
+        try:
+            (RUNTIME / f"crash_{datetime.now():%H%M%S}.log").write_text(text, encoding="utf-8")
+        except OSError:
+            pass
+        sys.__stderr__.write(text) if sys.stderr else None
+    sys.excepthook = crash_hook
     ap = argparse.ArgumentParser(description="汽水音乐自动看广告助手")
     ap.add_argument("--once", action="store_true", help="截一屏并打印 OCR 文字，不点击")
     ap.add_argument("--dry-run", action="store_true", help="识别并打日志，但不执行点击")
