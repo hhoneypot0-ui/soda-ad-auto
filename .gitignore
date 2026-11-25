@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+config.json
+runtime/
+debug_clicks/
+icon/preview.png
