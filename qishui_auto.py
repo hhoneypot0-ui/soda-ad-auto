@@ -63,6 +63,21 @@ def save_img(path: Path, img, quality: int = 85) -> bool:
         path.write_bytes(buf.tobytes())
     return ok
 
+def cleanup_images() -> int:
+    """退出时删除 runtime/ 与 debug_clicks/ 下所有截图（jpg/png），日志与状态文件保留。"""
+    n = 0
+    for d in (RUNTIME, BASE / "debug_clicks"):
+        if not d.exists():
+            continue
+        for f in d.iterdir():
+            if f.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                try:
+                    f.unlink()
+                    n += 1
+                except OSError:
+                    pass
+    return n
+
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
         example = BASE / "config.example.json"
@@ -593,7 +608,10 @@ def run(cfg: dict, args) -> None:
                     runs=state["runs"], pool_days=state["pool_days"],
                     pool_need=state["pool_need"],
                     last_action=state["last_action"], alive=False)
-        logall("已停止，音量与屏幕设置已恢复。")
+        if cfg.get("cleanup_on_exit", True):
+            n = cleanup_images()
+            logall(f"退出自动清理：删除 {n} 个截图文件（日志保留）")
+        logall("已停止（音量保持静音；屏幕设置已恢复）。")
 
 def pool_info(boxes: list[dict]) -> dict | None:
     """解析奖励绿色弹窗：『再看X个视频提前得 第Y日免费听』。
