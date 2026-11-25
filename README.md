@@ -1,5 +1,7 @@
 # SodaAdAuto · 汽水音乐自动领免费听时长
 
+🌐 **官网 / Homepage：https://hhoneypot0-ui.github.io/soda-ad-auto/**
+
 > 把"看广告领免费听天数"这件机械事，交给一台电脑和一根 USB 线。
 >
 > A Windows tool that automates Soda Music's (汽水音乐) official "watch ads to earn
