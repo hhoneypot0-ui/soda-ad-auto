@@ -52,6 +52,12 @@ h2{font-size:26px;margin:64px 0 8px;text-align:center}
   font-size:14.5px;color:var(--ink);display:flex;gap:12px;align-items:flex-start}
 .feat svg{width:19px;height:19px;flex:none;margin-top:2px}
 .feat small{display:block;color:var(--muted);margin-top:4px;line-height:1.55}
+.shots{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.shots figure{margin:0;background:var(--card);border:1px solid var(--stroke);border-radius:var(--r);
+  padding:12px;box-shadow:0 16px 40px rgba(56,86,140,.14)}
+.shots img{width:100%;border-radius:16px;display:block}
+.shots figcaption{font-size:13px;color:var(--muted);text-align:center;padding:10px 4px 2px}
+@media (max-width:760px){.shots{grid-template-columns:1fr}}
 .f-green svg{fill:var(--green)}.f-blue svg{fill:var(--blue)}.f-violet svg{fill:var(--violet)}
 .f-pink svg{fill:var(--pink)}.f-orange svg{fill:var(--orange)}
 .f-red svg{fill:var(--red)}
@@ -95,6 +101,15 @@ footer a{color:var(--blue)}
       <h3>停止</h3><p>一键收工：验证进程真停干净才报"已停止"，自动清理运行截图，全程保持静音。</p></div>
     <div class="step"><div class="dot3 d-violet"><svg viewBox="0 0 24 24"><path d="M5 15h3V9H5zm5.5 0h3V4h-3zM16 15h3v-8h-3z"/></svg></div>
       <h3>面板</h3><p>ColorOS 流体云风格的网页仪表盘：实时天数、30 天进度条、手机画面、运行日志。</p></div>
+  </div>
+
+  <h2>面板长这样</h2>
+  <p class="sub">ColorOS 流体云风格仪表盘（下图全部为演示数据，真实运行时数字换成你的进度）</p>
+  <div class="shots">
+    <figure><img src="assets/dashboard-demo.jpg" alt="监控面板主界面演示" loading="lazy">
+      <figcaption>主监控台：流体云胶囊 + 天数进度 + 手机实时画面 + 运行日志</figcaption></figure>
+    <figure><img src="assets/dashboard-welcome.jpg" alt="欢迎页演示" loading="lazy">
+      <figcaption>首次启动的欢迎页：它在干什么、连了哪台手机、怎么停</figcaption></figure>
   </div>
 
   <h2>为什么选它</h2>
